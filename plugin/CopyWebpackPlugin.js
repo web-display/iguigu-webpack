@@ -45,7 +45,9 @@ class CopyWebpackPlugin {
             // 获取文件数据
             const data = await readFile( absolutePath )
             // 获取文件名称
-            const filename = path.basename( absolutePath )
+            const relativePath = path.basename( absolutePath )
+            // 和to属性组合，没有to -->reset.css,有to -->css/reset.css
+            const filename = path.join( to, relativePath )
             return {
               data,//file data
               filename,
