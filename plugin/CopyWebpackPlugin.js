@@ -1,9 +1,13 @@
+const webpack = require( 'webpack' )
 const path = require( 'path' )
+const fs = require( 'fs' )
+const { promisify } = require( 'util' )
 const { validate } = require( 'schema-utils' )
 // 匹配文件列表，并根据规则忽略特定文件
-// const globby = require( 'globby' )
-
+// const globby = require( 'globby' ) //Error
+const readFile = promisify( fs.readFile )
 const schema = require( './schema.json' )
+const { RawSource } = webpack.sources
 
 class CopyWebpackPlugin {
   // 插件的配置在constructor中接收
@@ -25,7 +29,7 @@ class CopyWebpackPlugin {
         // 将from中的资源复制到to中，输出出去
         const { from, ignore } = this.options
         const to = this.options.to || '.'
-        // 1.读取from中所有资源
+        // 1.过滤掉ignore的文件
 
         // context就是webpack配置,就是运行代码的路径
         const context = compiler.options.context //等价于 process.cwd()
@@ -35,9 +39,32 @@ class CopyWebpackPlugin {
         let { globby } = await import( 'globby' )
         const paths = await globby( absoluteFrom, { ignore } ) //所有要加载的文件数组
         console.log( paths )
-        // 2.过滤掉ignore的文件
+        // 2.读取paths中所有资源
+        const files = await Promise.all(
+          paths.map( async ( absolutePath ) => {
+            // 获取文件数据
+            const data = await readFile( absolutePath )
+            // 获取文件名称
+            const filename = path.basename( absolutePath )
+            return {
+              data,//file data
+              filename,
+            }
+          } )
+        )
         // 3.生成webpack格式的文件
+        const assets = files.map( ( file ) => {
+          const source = new RawSource( file.data )
+          return {
+            source,
+            filename: file.filename
+          }
+        } )
         // 4.添加到compilation中，输出出去
+        assets.forEach( ( asset ) => {
+          compilation.emitAsset( asset.filename, asset.source )
+        } )
+        cb()
       } )
     } )
   }
